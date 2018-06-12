@@ -1,35 +1,39 @@
-version: '2'
+version: '3'
 
 services:
   confluence:
     image: blacklabelops/confluence
+    restart: always
     container_name: confluence
     hostname: confluence
     networks:
       - confluencenet
     volumes:
-      - confluencedata:/var/atlassian/confluence
+      - ./confluencedata:/var/atlassian/confluence
     ports:
       - '80:8090'
       - '8091:8091'
     environment:
       - 'CATALINA_OPTS= -Xms256m -Xmx1g'
-      - 'CONFLUENCE_PROXY_NAME='
-      - 'CONFLUENCE_PROXY_PORT='
-      - 'CONFLUENCE_PROXY_SCHEME='
-      - 'CONFLUENCE_DELAYED_START='
+      - 'CONFLUENCE_PROXY_NAME=devpyo.iptime.org'
+      - 'CONFLUENCE_PROXY_PORT=443'
+      - 'CONFLUENCE_PROXY_SCHEME=https'
+      - 'CONFLUENCE_DELAYED_START=10s'
     labels:
       com.blacklabelops.description: "Atlassian Confluence"
       com.blacklabelops.service: "confluence"
+    depends_on:
+      - postgresql
 
   postgresql:
     image: blacklabelops/postgres
+    restart: always
     container_name: postgres
     hostname: postgres
     networks:
       - confluencenet
     volumes:
-      - postgresqldata:/var/lib/postgresql/data
+      - ./postgresqldata:/var/lib/postgresql/data
     environment:
       - 'POSTGRES_USER=confluencedb'
       # CHANGE THE PASSWORD!
@@ -41,10 +45,36 @@ services:
     labels:
       com.blacklabelops.description: "PostgreSQL Database Server"
       com.blacklabelops.service: "postgresql"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+
+  nginx:
+    image: blacklabelops/nginx
+    restart: always
+    container_name: nginx
+    hostname: nginx
+    networks:
+      - confluencenet
+    environment:
+      - 'SERVER1REVERSE_PROXY_LOCATION1=/'
+      - 'SERVER1REVERSE_PROXY_PASS1=http://confluence:8090'
+      - 'SERVER1REVERSE_PROXY_APPLICATION1=confluence'
+      - 'SERVER1CERTIFICATE_DNAME=/CN=devpyo.iptime.org/OU=DevPyoOrg/O=ConfluenceUnit/L=Confluence/C=KR'
+      - 'SERVER1HTTPS_ENABLED=true'
+      - 'SERVER1HTTP_ENABLED=false'
+    volumes:
+      - ./keys:/etc/nginx/keys
+    ports:
+      - '443:443'
+    depends_on:
+      - confluence
 
 volumes:
-  confluencedata:
-    external: false
+#  confluencedata:
+#    external: false
   postgresqldata:
     external: false
 
