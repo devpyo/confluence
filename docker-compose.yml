@@ -2,7 +2,8 @@ version: '3'
 
 services:
   confluence:
-    image: blacklabelops/confluence
+    #image: blacklabelops/confluence
+    build: .
     restart: always
     container_name: confluence
     hostname: confluence
